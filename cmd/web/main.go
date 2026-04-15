@@ -1,35 +1,40 @@
 package main
 
 import (
-	"log"
+	"flag"
+	"log/slog"
 	"net/http"
+	"os"
 )
 
+// Define an application struct to hold application-wide dependencies.
+type application struct {
+	logger *slog.Logger
+}
+
 func main() {
-	// Initialize a new servemux.
-	mux := http.NewServeMux()
+	// Define a command-line flag with the name 'addr', a default value of ":4000",
+	// and some help text.
+	addr := flag.String("addr", ":4000", "HTTP network address")
 
-	// Create file server to serve files out of "./ui/static" directory.
-	fileServer := http.FileServer(http.Dir("./ui/static"))
+	// Parse the command-line flag.
+	flag.Parse()
 
-	// Register file server as the handler for all paths starting with "/static".
-	mux.Handle("GET /static/", http.StripPrefix("/static/", fileServer))
+	// Initialize a structured logger which writes to stdout with default settings.
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
-	// Register other functions and URL patterns.
-	mux.HandleFunc("GET /{$}", home)                          // Display home page
-	mux.HandleFunc("GET /snippet/view/{id}", snippetView)     // Display specific snippet
-	mux.HandleFunc("GET /snippet/create", snippetCreate)      // Display form for creating new snippet
-	mux.HandleFunc("POST /snippet/create", snippetCreatePost) // Save new snippet
+	// Initialize new instance of the application struct.
+	app := &application{
+		logger: logger,
+	}
 
 	// Print log message to indicate server is starting.
-	log.Print("starting server on :4000")
+	logger.Info("starting server", "addr", *addr)
 
 	// Use the http.ListenAndServe() function to start a new web server.
-	// We pass two parameters: the TCP network address to listen on (":4000")
-	// and the servemux we just created. If http.ListenAndServe() returns an error
-	// we use the log.Fatal() function to log the error message and terminate the
-	// program. Note that any error returned by http.ListenAndServe() is always
-	// non-nil.
-	err := http.ListenAndServe(":4000", mux)
-	log.Fatal(err)
+	// We pass two parameters: the TCP network address to listen on (default: ":4000")
+	// and the servemux from routes.go.
+	err := http.ListenAndServe(*addr, app.routes())
+	logger.Error(err.Error())
+	os.Exit(1)
 }
