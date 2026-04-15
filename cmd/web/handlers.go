@@ -3,8 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-
-	//"html/template"
 	"net/http"
 	"strconv"
 
@@ -20,34 +18,12 @@ func (app *application) home(writer http.ResponseWriter, request *http.Request) 
 		return
 	}
 
-	for _, snippet := range snippets {
-		fmt.Fprintf(writer, "%+v\n", snippet)
-	}
+	// Call helper to get a templateData struct containing the default data,
+	// and add snippets slice.
+	data := app.newTemplateData(request)
+	data.Snippets = snippets
 
-	/*
-		// Initialize a slice containing the template file paths.
-		// The file containing the base template must be the first file.
-		templateFiles := []string{
-			"./ui/html/base.html",
-			"./ui/html/partials/nav.html",
-			"./ui/html/pages/home.html",
-		}
-
-		// Read HTML template files into a template set. If there's an error, we log
-		// the error message, send an Internal Server Error response, and return
-		// from the handler.
-		templateSet, err := template.ParseFiles(templateFiles...)
-		if err != nil {
-			app.serverError(writer, request, err)
-			return
-		}
-
-		// We then write the template content as the response body.
-		err = templateSet.ExecuteTemplate(writer, "base", nil)
-		if err != nil {
-			app.serverError(writer, request, err)
-		}
-	*/
+	app.render(writer, request, http.StatusOK, "home.html", data)
 }
 
 func (app *application) snippetView(writer http.ResponseWriter, request *http.Request) {
@@ -70,8 +46,12 @@ func (app *application) snippetView(writer http.ResponseWriter, request *http.Re
 		return
 	}
 
-	// Write snippet data as plain-text HTTP response body.
-	fmt.Fprintf(writer, "%+v", snippet)
+	// Call helper to get a templateData struct containing the default data,
+	// and add snippets slice.
+	data := app.newTemplateData(request)
+	data.Snippet = snippet
+
+	app.render(writer, request, http.StatusOK, "view.html", data)
 }
 
 func (app *application) snippetCreate(writer http.ResponseWriter, request *http.Request) {
