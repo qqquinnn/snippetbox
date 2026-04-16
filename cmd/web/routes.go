@@ -1,9 +1,13 @@
 package main
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/justinas/alice"
+)
 
 // Returns a servemux containing the application routes.
-func (app *application) routes() *http.ServeMux {
+func (app *application) routes() http.Handler {
 	// Initialize a new servemux.
 	mux := http.NewServeMux()
 
@@ -19,5 +23,8 @@ func (app *application) routes() *http.ServeMux {
 	mux.HandleFunc("GET /snippet/create", app.snippetCreate)      // Display form for creating new snippet
 	mux.HandleFunc("POST /snippet/create", app.snippetCreatePost) // Save new snippet
 
-	return mux
+	// Create and return middleware chain containing 'standard' middleware
+	// which will be used for every request the application receives.
+	standard := alice.New(app.recoverPanic, app.logRequest, commonHeaders)
+	return standard.Then(mux)
 }
