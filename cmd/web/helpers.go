@@ -10,7 +10,7 @@ import (
 	"github.com/go-playground/form/v4"
 )
 
-// Writes a log entry at Error level, then sends generic 500 Internal Server
+// Writes a log entry at Error level, then sends generic 500 Internal Server.
 // Error response to user.
 func (app *application) serverError(writer http.ResponseWriter, request *http.Request, err error) {
 	var (
@@ -27,10 +27,11 @@ func (app *application) clientError(writer http.ResponseWriter, status int) {
 	http.Error(writer, http.StatusText(status), status)
 }
 
-// Returns a templateData struct initialized with the current year.
+// Returns a templateData struct initialized with the current year and any flash messages.
 func (app *application) newTemplateData(request *http.Request) templateData {
 	return templateData{
 		CurrentYear: time.Now().Year(),
+		Flash:       app.sessionManager.PopString(request.Context(), "flash"),
 	}
 }
 
