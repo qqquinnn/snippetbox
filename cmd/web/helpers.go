@@ -2,9 +2,12 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/go-playground/form/v4"
 )
 
 // Writes a log entry at Error level, then sends generic 500 Internal Server
@@ -31,8 +34,9 @@ func (app *application) newTemplateData(request *http.Request) templateData {
 	}
 }
 
+// Retrieves the appropriate template set from cache and writes to the ResponseWriter.
 func (app *application) render(writer http.ResponseWriter, request *http.Request, status int, page string, data templateData) {
-	// Retrieve appropriate template set from cache based on page name.
+	// Retrieve template set based on page name.
 	templateSet, ok := app.templateCache[page]
 	if !ok {
 		err := fmt.Errorf("the template %s does not exist", page)
@@ -56,4 +60,28 @@ func (app *application) render(writer http.ResponseWriter, request *http.Request
 
 	// Write contents of buffer to ResponseWriter
 	buf.WriteTo(writer)
+}
+
+// Handles decoding of HTML form data to a target destination.
+func (app *application) decodePostForm(r *http.Request, dst any) error {
+	err := r.ParseForm()
+	if err != nil {
+		return err
+	}
+
+	// Call method on the decoder instance, with the target destination as
+	// the first parameter.
+	err = app.formDecoder.Decode(dst, r.PostForm)
+	if err != nil {
+		// If target destination is invalid, Decode() returns form.InvalidDecoderError.
+		// Panic if this occurs.
+		if _, ok := errors.AsType[*form.InvalidDecoderError](err); ok {
+			panic(err)
+		}
+
+		// Return all other errors normally.
+		return err
+	}
+
+	return nil
 }
