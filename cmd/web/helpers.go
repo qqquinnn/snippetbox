@@ -10,7 +10,7 @@ import (
 	"github.com/go-playground/form/v4"
 )
 
-// Writes a log entry at Error level, then sends generic 500 Internal Server.
+// Writes a log entry at Error level, then sends generic 500 Internal Server
 // Error response to user.
 func (app *application) serverError(writer http.ResponseWriter, request *http.Request, err error) {
 	var (

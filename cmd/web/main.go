@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"flag"
 	"html/template"
@@ -15,6 +16,7 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-playground/form/v4"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
 )
 
 // Define an application struct to hold application-wide dependencies.
@@ -27,12 +29,21 @@ type application struct {
 }
 
 func main() {
-	// Define command-line flags.
+	// Load .env file if it exists.
+	_ = godotenv.Load()
+
+	// Define command-line flags using env variables as defaults.
+	defaultDSN := os.Getenv("SNIPPETBOX_DSN")
+	dsn := flag.String("dsn", defaultDSN, "MySQL data source name")
 	addr := flag.String("addr", ":4000", "HTTP network address")
-	dsn := flag.String("dsn", "web:userpassword@/snippetbox?parseTime=true", "MySQL data source name")
 
 	// Parse the command-line flags.
 	flag.Parse()
+
+	// Panic if DSN config is missing.
+	if *dsn == "" {
+		panic("database DSN must be provided via -dsn flag or SNIPPETBOX_DSN env var")
+	}
 
 	// Initialize a structured logger which writes to stdout with default settings.
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -62,6 +73,7 @@ func main() {
 	sessionManager := scs.New()
 	sessionManager.Store = mysqlstore.New(db)
 	sessionManager.Lifetime = 12 * time.Hour
+	sessionManager.Cookie.Secure = true
 
 	// Initialize new instance of the application struct.
 	app := &application{
@@ -72,13 +84,37 @@ func main() {
 		sessionManager: sessionManager,
 	}
 
-	// Print log message to indicate server is starting.
-	logger.Info("starting server", "addr", *addr)
+	// Initialize a struct to hold non-default TLS settings.
+	tlsConfig := &tls.Config{
+		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+	}
 
-	// Use the http.ListenAndServe() function to start a new web server.
-	// We pass two parameters: the TCP network address to listen on (default: ":4000")
-	// and the servemux from routes.go.
-	err = http.ListenAndServe(*addr, app.routes())
+	// Initialize a new http.Server struct.
+	srv := &http.Server{
+		Addr:    *addr,
+		Handler: app.routes(),
+		// Writes log entries at the Error level.
+		ErrorLog:  slog.NewLogLogger(logger.Handler(), slog.LevelError),
+		TLSConfig: tlsConfig,
+		// Idle, Read & Write timeouts.
+		IdleTimeout:  time.Minute,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+	}
+
+	// Fetch TLS cert & key; panic if missing.
+	tlsCert := os.Getenv("TLS_CERT")
+	tlsKey := os.Getenv("TLS_KEY")
+	if tlsCert == "" || tlsKey == "" {
+		panic("Paths to TLS certificate and private key must be provided via TLS_CERT and TLS_KEY env vars")
+	}
+
+	// Print log message to indicate server is starting.
+	logger.Info("starting server", "addr", srv.Addr)
+
+	// Use the ListenAndServeTLS() function on the http.Server struct
+	// to start the server.
+	err = srv.ListenAndServeTLS(tlsCert, tlsKey)
 	logger.Error(err.Error())
 	os.Exit(1)
 }
