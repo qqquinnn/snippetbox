@@ -3,6 +3,8 @@ package main
 import (
 	"net/http"
 
+	"github.com/qqquinnn/snippetbox/ui"
+
 	"github.com/justinas/alice"
 )
 
@@ -11,10 +13,9 @@ func (app *application) routes() http.Handler {
 	// Initialize a new servemux.
 	mux := http.NewServeMux()
 
-	// Create file server to serve files out of "./ui/static" directory, and
+	// Create file server to serve the embedded files in ui.Files, and
 	// register file server as the handler for all paths starting with "/static".
-	fileServer := http.FileServer(http.Dir("./ui/static"))
-	mux.Handle("GET /static/", http.StripPrefix("/static/", fileServer))
+	mux.Handle("GET /static/", http.FileServerFS(ui.Files))
 
 	// Unprotected application routes using "dynamic" middleware chain.
 	dynamic := alice.New(app.sessionManager.LoadAndSave, preventCSRF, app.authenticate)
