@@ -16,14 +16,22 @@ func (app *application) routes() http.Handler {
 	fileServer := http.FileServer(http.Dir("./ui/static"))
 	mux.Handle("GET /static/", http.StripPrefix("/static/", fileServer))
 
-	// Create new middleware chain for dynamic application routes.
-	dynamic := alice.New(app.sessionManager.LoadAndSave)
+	// Unprotected application routes using "dynamic" middleware chain.
+	dynamic := alice.New(app.sessionManager.LoadAndSave, preventCSRF)
 
-	// Register other functions and URL patterns.
-	mux.Handle("GET /{$}", dynamic.ThenFunc(app.home))                          // Display home page
-	mux.Handle("GET /snippet/view/{id}", dynamic.ThenFunc(app.snippetView))     // Display specific snippet
-	mux.Handle("GET /snippet/create", dynamic.ThenFunc(app.snippetCreate))      // Display form for creating new snippet
-	mux.Handle("POST /snippet/create", dynamic.ThenFunc(app.snippetCreatePost)) // Save new snippet
+	mux.Handle("GET /{$}", dynamic.ThenFunc(app.home))
+	mux.Handle("GET /snippet/view/{id}", dynamic.ThenFunc(app.snippetView))
+	mux.Handle("GET /user/signup", dynamic.ThenFunc(app.userSignup))
+	mux.Handle("POST /user/signup", dynamic.ThenFunc(app.userSignupPost))
+	mux.Handle("GET /user/login", dynamic.ThenFunc(app.userLogin))
+	mux.Handle("POST /user/login", dynamic.ThenFunc(app.userLoginPost))
+
+	// Protected (auth-only) application routes using "protected" middleware chain.
+	protected := dynamic.Append(app.requireAuthentication)
+
+	mux.Handle("GET /snippet/create", protected.ThenFunc(app.snippetCreate))
+	mux.Handle("POST /snippet/create", protected.ThenFunc(app.snippetCreatePost))
+	mux.Handle("POST /user/logout", protected.ThenFunc(app.userLogoutPost))
 
 	// Create and return middleware chain containing 'standard' middleware
 	// which will be used for every request the application receives.

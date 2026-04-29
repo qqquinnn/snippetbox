@@ -8,40 +8,43 @@ import (
 	"time"
 
 	"github.com/go-playground/form/v4"
+	"github.com/justinas/nosurf"
 )
 
 // Writes a log entry at Error level, then sends generic 500 Internal Server
 // Error response to user.
-func (app *application) serverError(writer http.ResponseWriter, request *http.Request, err error) {
+func (app *application) serverError(w http.ResponseWriter, r *http.Request, err error) {
 	var (
-		method = request.Method
-		uri    = request.URL.RequestURI()
+		method = r.Method
+		uri    = r.URL.RequestURI()
 	)
 
 	app.logger.Error(err.Error(), "method", method, "uri", uri)
-	http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+	http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 }
 
 // Sends a specific status code & corresponding description to user.
-func (app *application) clientError(writer http.ResponseWriter, status int) {
-	http.Error(writer, http.StatusText(status), status)
+func (app *application) clientError(w http.ResponseWriter, status int) {
+	http.Error(w, http.StatusText(status), status)
 }
 
 // Returns a templateData struct initialized with the current year and any flash messages.
-func (app *application) newTemplateData(request *http.Request) templateData {
+func (app *application) newTemplateData(r *http.Request) templateData {
 	return templateData{
-		CurrentYear: time.Now().Year(),
-		Flash:       app.sessionManager.PopString(request.Context(), "flash"),
+		CurrentYear:     time.Now().Year(),
+		Flash:           app.sessionManager.PopString(r.Context(), "flash"),
+		IsAuthenticated: app.isAuthenticated(r),
+		CSRFToken:       nosurf.Token(r),
 	}
 }
 
 // Retrieves the appropriate template set from cache and writes to the ResponseWriter.
-func (app *application) render(writer http.ResponseWriter, request *http.Request, status int, page string, data templateData) {
+func (app *application) render(w http.ResponseWriter, r *http.Request, status int, page string, data templateData) {
 	// Retrieve template set based on page name.
 	templateSet, ok := app.templateCache[page]
 	if !ok {
 		err := fmt.Errorf("the template %s does not exist", page)
-		app.serverError(writer, request, err)
+		app.serverError(w, r, err)
 		return
 	}
 
@@ -51,16 +54,16 @@ func (app *application) render(writer http.ResponseWriter, request *http.Request
 	// Execute template set and write to buffer.
 	err := templateSet.ExecuteTemplate(buf, "base", data)
 	if err != nil {
-		app.serverError(writer, request, err)
+		app.serverError(w, r, err)
 		return
 	}
 
 	// If template is written to buffer without errors,
 	// write out provided HTTP status code to ResponseWriter.
-	writer.WriteHeader(status)
+	w.WriteHeader(status)
 
 	// Write contents of buffer to ResponseWriter
-	buf.WriteTo(writer)
+	buf.WriteTo(w)
 }
 
 // Handles decoding of HTML form data to a target destination.
@@ -85,4 +88,9 @@ func (app *application) decodePostForm(r *http.Request, dst any) error {
 	}
 
 	return nil
+}
+
+// Returns true if the current request is from an authenticated user.
+func (app *application) isAuthenticated(r *http.Request) bool {
+	return app.sessionManager.Exists(r.Context(), "authenticatedUserID")
 }

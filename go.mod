@@ -11,4 +11,8 @@ require (
 	github.com/justinas/alice v1.2.0
 )
 
-require filippo.io/edwards25519 v1.2.0 // indirect
+require (
+	filippo.io/edwards25519 v1.2.0 // indirect
+	github.com/justinas/nosurf v1.2.0 // indirect
+	golang.org/x/crypto v0.50.0 // indirect
+)
