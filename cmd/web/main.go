@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"database/sql"
 	"flag"
@@ -8,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"time"
 
 	"github.com/qqquinnn/snippetbox/internal/models"
@@ -22,14 +24,15 @@ import (
 // Define an application struct to hold application-wide dependencies.
 type application struct {
 	logger         *slog.Logger
-	snippets       *models.SnippetModel
-	users          *models.UserModel
+	snippets       models.SnippetModelInterface
+	users          models.UserModelInterface
 	templateCache  map[string]*template.Template
 	formDecoder    *form.Decoder
 	sessionManager *scs.SessionManager
 }
 
 func main() {
+	ctx := context.Background()
 	// Load .env file if it exists.
 	_ = godotenv.Load()
 
@@ -115,11 +118,25 @@ func main() {
 	// Print log message to indicate server is starting.
 	logger.Info("starting server", "addr", srv.Addr)
 
+	var c chan os.Signal = make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		<-c
+		logger.Info("beginning graceful shutdown")
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		srv.Shutdown(ctx)
+	}()
+
 	// Use the ListenAndServeTLS() function on the http.Server struct
 	// to start the server.
 	err = srv.ListenAndServeTLS(tlsCert, tlsKey)
-	logger.Error(err.Error())
-	os.Exit(1)
+	if err == http.ErrServerClosed {
+		logger.Info("closed gracefully")
+	} else {
+		logger.Error(err.Error())
+		os.Exit(1)
+	}
 }
 
 // Wraps sql.Open() and returns a sql.DB connection pool.

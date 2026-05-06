@@ -9,8 +9,8 @@
         </div>
         <pre><code>{{.Content}}</code></pre>
         <div class="metadata">
-            <time>Created: {{humanDate .Created}}</time>
-            <time>Expires: {{humanDate .Expires}}</time>
+            <time class="local-date" datetime="{{isoDate .Created}}">Created: {{humanDate .Created}}</time>
+            <time class="local-date" datetime="{{isoDate .Expires}}">Expires: {{humanDate .Expires}}</time>
         </div>
     </div>
     {{end}}

@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-// Define a Snippet type to hold data for an individual snippet.
-// The fields of the struct correspond to the fields in the MySQL table.
+// Holds data for an individual snippet. Corresponds to MySQL table.
 type Snippet struct {
 	ID      int
 	Title   string
@@ -16,13 +15,20 @@ type Snippet struct {
 	Expires time.Time
 }
 
-// Define a SnippetModel type which wraps a sql.DB connection pool.
+// Wraps a sql.DB connection pool.
 type SnippetModel struct {
 	DB *sql.DB
 }
 
+// Describes methods of SnippetModel struct.
+type SnippetModelInterface interface {
+	Insert(title, content string, expires int) (int, error)
+	Get(id int) (Snippet, error)
+	Latest() ([]Snippet, error)
+}
+
 // Insert a new snippet into the database.
-func (model *SnippetModel) Insert(title string, content string, expires int) (int, error) {
+func (model *SnippetModel) Insert(title, content string, expires int) (int, error) {
 	stmt := `INSERT INTO snippets (title, content, created, expires)
 	VALUES(?, ?, UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? DAY))`
 

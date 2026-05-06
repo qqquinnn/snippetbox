@@ -17,6 +17,9 @@ func (app *application) routes() http.Handler {
 	// register file server as the handler for all paths starting with "/static".
 	mux.Handle("GET /static/", http.FileServerFS(ui.Files))
 
+	// New GET /ping route for health check.
+	mux.HandleFunc("GET /ping", ping)
+
 	// Unprotected application routes using "dynamic" middleware chain.
 	dynamic := alice.New(app.sessionManager.LoadAndSave, preventCSRF, app.authenticate)
 

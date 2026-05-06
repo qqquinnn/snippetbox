@@ -12,7 +12,7 @@
         {{range .Snippets}}
         <tr>
             <td><a href="/snippet/view/{{.ID}}">{{.Title}}</a></td>
-            <td>{{humanDate .Created}}</td>
+            <td><time class="local-date" datetime="{{isoDate .Created}}">{{humanDate .Created}}</time></td>
             <td>#{{.ID}}</td>
         </tr>
         {{end}}

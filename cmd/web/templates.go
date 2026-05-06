@@ -22,15 +22,29 @@ type templateData struct {
 	CSRFToken       string
 }
 
-// Returns formatted string representation of a time.Time value.
+// Returns formatted UTC representation of a time.Time value.
 func humanDate(t time.Time) string {
-	return t.Format("02 Jan 2006 at 15:04 UTC")
+	if t.IsZero() {
+		return ""
+	}
+
+	return t.UTC().Format("02 Jan 2006 at 15:04 UTC")
+}
+
+// Returns ISO 8601 representation of time.Time for further processing.
+func isoDate(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+
+	return t.Format(time.RFC3339)
 }
 
 // Initialize a template.FuncMap value and store it in a global variable.
 // Acts as a lookup table mapping names to functions.
 var functions = template.FuncMap{
 	"humanDate": humanDate,
+	"isoDate":   isoDate,
 }
 
 func newTemplateCache() (map[string]*template.Template, error) {
