@@ -1,2 +1,5 @@
-tls/
+tls
 .env
+bin
+tmp
+testdata
