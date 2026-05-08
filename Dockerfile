@@ -12,6 +12,9 @@ RUN go mod download
 # Copy the rest of the source code.
 COPY . .
 
+# Run tests.
+RUN go test ./cmd/web/
+
 # Build the application.
 # -o web: name the output binary 'web'
 # ./cmd/web: path to the main package

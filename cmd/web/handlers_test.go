@@ -23,6 +23,41 @@ func TestPing(t *testing.T) {
 	assert.Equal(t, res.body, "OK")
 }
 
+func TestSnippetCreate(t *testing.T) {
+	app := newTestApplication(t)
+	ts := newTestServer(t, app.routes())
+	defer ts.Close()
+
+	t.Run("Unauthenticated", func(t *testing.T) {
+		ts.resetClientCookieJar(t)
+
+		res := ts.get(t, "/snippet/create")
+		assert.Equal(t, res.status, http.StatusSeeOther)
+		assert.Equal(t, res.headers.Get("Location"), "/user/login")
+	})
+
+	t.Run("Authenticated", func(t *testing.T) {
+		ts.resetClientCookieJar(t)
+
+		// Make GET /user/login request.
+		res := ts.get(t, "/user/login")
+
+		// Make POST /user/login request using credentials from mock user
+		// model & CSRF token from previous response.
+		form := url.Values{}
+		form.Add("email", "alice@example.com")
+		form.Add("password", "pa$$word")
+		form.Add("csrf_token", extractCSRFToken(t, res.body))
+
+		ts.postForm(t, "/user/login", form)
+
+		// Check that authenticated user is shown create snippet form.
+		res = ts.get(t, "/snippet/create")
+		assert.Equal(t, res.status, http.StatusOK)
+		assert.True(t, strings.Contains(res.body, `<form action="/snippet/create" method="POST">`))
+	})
+}
+
 func TestSnippetView(t *testing.T) {
 	// Create application struct (w/ mocked dependencies) & new test server.
 	app := newTestApplication(t)

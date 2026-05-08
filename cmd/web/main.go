@@ -23,6 +23,7 @@ import (
 
 // Define an application struct to hold application-wide dependencies.
 type application struct {
+	debug          bool
 	logger         *slog.Logger
 	snippets       models.SnippetModelInterface
 	users          models.UserModelInterface
@@ -40,6 +41,7 @@ func main() {
 	defaultDSN := os.Getenv("SNIPPETBOX_DSN")
 	dsn := flag.String("dsn", defaultDSN, "MySQL data source name")
 	addr := flag.String("addr", ":4000", "HTTP network address")
+	debug := flag.Bool("debug", false, "Enable debug mode")
 
 	// Parse the command-line flags.
 	flag.Parse()
@@ -81,6 +83,7 @@ func main() {
 
 	// Initialize new instance of the application struct.
 	app := &application{
+		debug:          *debug,
 		logger:         logger,
 		snippets:       &models.SnippetModel{DB: db},
 		users:          &models.UserModel{DB: db},

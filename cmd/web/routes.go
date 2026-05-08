@@ -17,13 +17,14 @@ func (app *application) routes() http.Handler {
 	// register file server as the handler for all paths starting with "/static".
 	mux.Handle("GET /static/", http.FileServerFS(ui.Files))
 
-	// New GET /ping route for health check.
+	// Route for health check.
 	mux.HandleFunc("GET /ping", ping)
 
 	// Unprotected application routes using "dynamic" middleware chain.
 	dynamic := alice.New(app.sessionManager.LoadAndSave, preventCSRF, app.authenticate)
 
 	mux.Handle("GET /{$}", dynamic.ThenFunc(app.home))
+	mux.Handle("GET /about", dynamic.ThenFunc(app.about))
 	mux.Handle("GET /snippet/view/{id}", dynamic.ThenFunc(app.snippetView))
 	mux.Handle("GET /user/signup", dynamic.ThenFunc(app.userSignup))
 	mux.Handle("POST /user/signup", dynamic.ThenFunc(app.userSignupPost))
@@ -35,6 +36,9 @@ func (app *application) routes() http.Handler {
 
 	mux.Handle("GET /snippet/create", protected.ThenFunc(app.snippetCreate))
 	mux.Handle("POST /snippet/create", protected.ThenFunc(app.snippetCreatePost))
+	mux.Handle("GET /account/view", protected.ThenFunc(app.accountView))
+	mux.Handle("GET /account/password/update", protected.ThenFunc(app.accountPasswordUpdate))
+	mux.Handle("POST /account/password/update", protected.ThenFunc(app.accountPasswordUpdatePost))
 	mux.Handle("POST /user/logout", protected.ThenFunc(app.userLogoutPost))
 
 	// Create and return middleware chain containing 'standard' middleware

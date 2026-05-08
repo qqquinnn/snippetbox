@@ -33,6 +33,13 @@ type userLoginForm struct {
 	validator.Validator `form:"-"`
 }
 
+type accountPasswordUpdateForm struct {
+	CurrentPassword         string `form:"currentPassword"`
+	NewPassword             string `form:"newPassword"`
+	NewPasswordConfirmation string `form:"newPasswordConfirmation"`
+	validator.Validator     `form:"-"`
+}
+
 // Displays the home page.
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
 	snippets, err := app.snippets.Latest()
@@ -47,6 +54,14 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 	data.Snippets = snippets
 
 	app.render(w, r, http.StatusOK, "home.html", data)
+}
+
+// Displays the 'about' page.
+func (app *application) about(w http.ResponseWriter, r *http.Request) {
+	// Get templateData struct to pass to the helper.
+	data := app.newTemplateData(r)
+
+	app.render(w, r, http.StatusOK, "about.html", data)
 }
 
 // Displays a specific snippet.
@@ -245,8 +260,15 @@ func (app *application) userLoginPost(w http.ResponseWriter, r *http.Request) {
 	// Add ID of current user to session, logging them in.
 	app.sessionManager.Put(r.Context(), "authenticatedUserID", id)
 
-	// Redirect user to create snippet page.
-	http.Redirect(w, r, "/snippet/create", http.StatusSeeOther)
+	// Check session data for desired URL path; redirect there if exists.
+	path := app.sessionManager.PopString(r.Context(), "redirectPathAfterLogin")
+	if path != "" {
+		http.Redirect(w, r, path, http.StatusSeeOther)
+		return
+	}
+
+	// Redirect user to home page.
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // Logs the user out.
@@ -264,6 +286,83 @@ func (app *application) userLogoutPost(w http.ResponseWriter, r *http.Request) {
 	// Display flash message and redirect user.
 	app.sessionManager.Put(r.Context(), "flash", "You've been logged out successfully!")
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// Fetches & displays details of relevant user.
+func (app *application) accountView(w http.ResponseWriter, r *http.Request) {
+	userID := app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+
+	user, err := app.users.Get(userID)
+	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			http.Redirect(w, r, "/user/login", http.StatusSeeOther)
+		} else {
+			app.serverError(w, r, err)
+		}
+		return
+	}
+
+	data := app.newTemplateData(r)
+	data.User = user
+
+	app.render(w, r, http.StatusOK, "account.html", data)
+}
+
+// Displays a form for changing a user password.
+func (app *application) accountPasswordUpdate(w http.ResponseWriter, r *http.Request) {
+	data := app.newTemplateData(r)
+	data.Form = accountPasswordUpdateForm{}
+
+	app.render(w, r, http.StatusOK, "password.html", data)
+}
+
+// Changes a user's password.
+func (app *application) accountPasswordUpdatePost(w http.ResponseWriter, r *http.Request) {
+	var form accountPasswordUpdateForm
+
+	// Parse form data into struct.
+	err := app.decodePostForm(r, &form)
+	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	// Validate form contents.
+	form.CheckField(validator.NotBlank(form.CurrentPassword), "currentPassword", "This field cannot be blank")
+	form.CheckField(validator.NotBlank(form.NewPassword), "newPassword", "This field cannot be blank")
+	form.CheckField(validator.MinChars(form.NewPassword, 8), "newPassword", "This field must be at least 8 characters long")
+	form.CheckField(validator.MaxBytes(form.NewPassword, 72), "newPassword", "This field must not be more than 72 bytes long")
+	form.CheckField(validator.NotBlank(form.NewPasswordConfirmation), "newPasswordConfirmation", "This field cannot be blank")
+	form.CheckField(form.NewPassword == form.NewPasswordConfirmation, "newPasswordConfirmation", "Passwords do not match")
+
+	if !form.Valid() {
+		data := app.newTemplateData(r)
+		data.Form = form
+		app.render(w, r, http.StatusUnprocessableEntity, "password.html", data)
+		return
+	}
+
+	// Get user ID, check credentials & update password if valid.
+	userID := app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+
+	err = app.users.PasswordUpdate(userID, form.CurrentPassword, form.NewPassword)
+	if err != nil {
+		if errors.Is(err, models.ErrInvalidCredentials) {
+			form.AddFieldError("currentPassword", "Current password is incorrect")
+
+			data := app.newTemplateData(r)
+			data.Form = form
+			app.render(w, r, http.StatusUnprocessableEntity, "password.html", data)
+		} else {
+			app.serverError(w, r, err)
+		}
+
+		return
+	}
+
+	// Display flash message & redirect if successful.
+	app.sessionManager.Put(r.Context(), "flash", "Your password has been updated!")
+	http.Redirect(w, r, "/account/view", http.StatusSeeOther)
 }
 
 // Uptime monitoring.
