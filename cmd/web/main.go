@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"database/sql"
 	"flag"
 	"html/template"
@@ -34,13 +33,14 @@ type application struct {
 
 func main() {
 	ctx := context.Background()
-	// Load .env file if it exists.
+	// Load .env file for local development.
 	_ = godotenv.Load()
 
 	// Define command-line flags using env variables as defaults.
 	defaultDSN := os.Getenv("SNIPPETBOX_DSN")
+	defaultAddr := os.Getenv("PORT")
 	dsn := flag.String("dsn", defaultDSN, "MySQL data source name")
-	addr := flag.String("addr", ":4000", "HTTP network address")
+	addr := flag.String("addr", defaultAddr, "HTTP network address")
 	debug := flag.Bool("debug", false, "Enable debug mode")
 
 	// Parse the command-line flags.
@@ -92,30 +92,15 @@ func main() {
 		sessionManager: sessionManager,
 	}
 
-	// Initialize a struct to hold non-default TLS settings.
-	tlsConfig := &tls.Config{
-		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
-		MinVersion:       tls.VersionTLS13,
-	}
-
 	// Initialize a new http.Server struct.
 	srv := &http.Server{
-		Addr:    *addr,
-		Handler: app.routes(),
-		// Writes log entries at the Error level.
-		ErrorLog:  slog.NewLogLogger(logger.Handler(), slog.LevelError),
-		TLSConfig: tlsConfig,
+		Addr:     *addr,
+		Handler:  app.routes(),
+		ErrorLog: slog.NewLogLogger(logger.Handler(), slog.LevelError),
 		// Idle, Read & Write timeouts.
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
-	}
-
-	// Fetch TLS cert & key; panic if missing.
-	tlsCert := os.Getenv("TLS_CERT")
-	tlsKey := os.Getenv("TLS_KEY")
-	if tlsCert == "" || tlsKey == "" {
-		panic("Paths to TLS certificate and private key must be provided via TLS_CERT and TLS_KEY env vars")
 	}
 
 	// Print log message to indicate server is starting.
@@ -133,7 +118,7 @@ func main() {
 
 	// Use the ListenAndServeTLS() function on the http.Server struct
 	// to start the server.
-	err = srv.ListenAndServeTLS(tlsCert, tlsKey)
+	err = srv.ListenAndServe()
 	if err == http.ErrServerClosed {
 		logger.Info("closed gracefully")
 	} else {
