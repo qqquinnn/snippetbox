@@ -9,8 +9,14 @@ import (
 // Creates new connection pool for test database, executes setup.sql
 // script, and registers 'cleanup' function that executes teardown.sql script.
 func newTestDB(t *testing.T) *sql.DB {
+	// Fetch test DSN.
+	dsn := os.Getenv("SNIPPETBOX_TEST_DSN")
+	if dsn == "" {
+		t.Fatal("DSN missing from environment.")
+	}
+
 	// Establish connection pool for test database.
-	db, err := sql.Open("mysql", "test_web:pass@/test_snippetbox?parseTime=true&multiStatements=true")
+	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}

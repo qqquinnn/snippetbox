@@ -1,20 +1,19 @@
 services:
   db:
     image: mysql:9.2
-    command: ["--collation-server=utf8mb4_unicode_ci"]
+    command: [ "--collation-server=utf8mb4_unicode_ci" ]
     restart: always
     environment:
       MYSQL_DATABASE: snippetbox
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_USER: web
-      MYSQL_PASSWORD: ${SNIPPETBOX_DB_PASSWORD}
     ports:
       - "3307:3306"
     volumes:
       - db-data:/var/lib/mysql
       - ./testdata/setup.sql:/docker-entrypoint-initdb.d/setup.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
       timeout: 20s
       retries: 10
   web:
@@ -24,8 +23,19 @@ services:
       - "4000:4000"
     env_file:
       - .env
+    depends_on:
+      db:
+        condition: service_healthy
+  test:
+    image: golang:1.26.2-alpine
+    profiles:
+      - testing
+    volumes:
+      - .:/app
+    working_dir: /app
+    command: go test -v ./internal/models/...
     environment:
-      - SNIPPETBOX_DSN=web:${SNIPPETBOX_DB_PASSWORD}@tcp(db:3306)/snippetbox?parseTime=true
+      - SNIPPETBOX_TEST_DSN=web:pass@tcp(db:3306)/snippetbox_test?parseTime=true
     depends_on:
       db:
         condition: service_healthy
