@@ -13,7 +13,7 @@ RUN go mod download
 COPY . .
 
 # Run tests.
-RUN go test ./cmd/web/
+RUN go test -v ./cmd/web/
 
 # Build the application.
 # -o web: name the output binary 'web'
@@ -32,11 +32,6 @@ WORKDIR /home/snippetbox
 
 # Copy only compiled binary from builder stage.
 COPY --from=builder /app/web .
-
-# Copy TLS certs.
-# In prod, these are likely mounted as secrets or volumes.
-# For local dev, we copy the folder.
-COPY --from=builder /app/tls ./tls
 
 # Application listens on :4000 by default.
 EXPOSE 4000

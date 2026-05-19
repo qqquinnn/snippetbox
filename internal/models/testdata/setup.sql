@@ -1,3 +1,5 @@
+USE snippetbox_test;
+
 CREATE TABLE snippets (
     id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,
     title VARCHAR(100) NOT NULL,
