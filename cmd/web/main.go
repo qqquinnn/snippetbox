@@ -40,7 +40,7 @@ func main() {
 	defaultDSN := os.Getenv("SNIPPETBOX_DSN")
 	defaultAddr := os.Getenv("PORT")
 	dsn := flag.String("dsn", defaultDSN, "MySQL data source name")
-	addr := flag.String("addr", defaultAddr, "HTTP network address")
+	addr := flag.String("addr", ":"+defaultAddr, "HTTP network address")
 	debug := flag.Bool("debug", false, "Enable debug mode")
 
 	// Parse the command-line flags.
