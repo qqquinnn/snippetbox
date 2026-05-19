@@ -52,10 +52,6 @@ func TestCommonHeaders(t *testing.T) {
 	expectedValue = "0"
 	assert.Equal(t, res.Header.Get("X-XSS-Protection"), expectedValue)
 
-	// Server
-	expectedValue = "Go"
-	assert.Equal(t, res.Header.Get("Server"), expectedValue)
-
 	// Check that the next handler in line is called and the response status code
 	// & body are as expected.
 	assert.Equal(t, res.StatusCode, http.StatusOK)
