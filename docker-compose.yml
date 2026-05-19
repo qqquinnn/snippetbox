@@ -1,22 +1,22 @@
 services:
   db:
-    image: mysql:9.2
-    command: [ "--collation-server=utf8mb4_unicode_ci" ]
+    image: postgres:17-alpine
     restart: always
     environment:
-      MYSQL_DATABASE: snippetbox
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_USER: web
-      MYSQL_PASSWORD: pass
+      POSTGRES_DB: snippetbox
+      POSTGRES_USER: web
+      POSTGRES_PASSWORD: pass
     ports:
-      - "3307:3306"
+      - "5432:5432"
     volumes:
-      - db-data:/var/lib/mysql
-      - ./testdata/setup.sql:/docker-entrypoint-initdb.d/setup.sql
+      - db-data:/var/lib/postgresql/data
+      - ./testdata/init-db.sh:/docker-entrypoint-initdb.d/01-init-db.sh
+      - ./testdata/setup.sql:/docker-entrypoint-initdb.d/02-setup.sql
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
-      timeout: 20s
-      retries: 10
+      test: [ "CMD-SHELL", "pg_isready -U web -d snippetbox" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   web:
     build: .
     restart: always
@@ -24,6 +24,8 @@ services:
       - "4000:4000"
     env_file:
       - .env
+    environment:
+      - SNIPPETBOX_DSN=postgres://web:pass@db:5432/snippetbox?sslmode=disable
     depends_on:
       db:
         condition: service_healthy
@@ -36,7 +38,7 @@ services:
     working_dir: /app
     command: go test -v ./internal/models/...
     environment:
-      - SNIPPETBOX_TEST_DSN=web:pass@tcp(db:3306)/snippetbox_test?parseTime=true&multiStatements=true
+      - SNIPPETBOX_TEST_DSN=postgres://web:pass@db:5432/snippetbox_test?sslmode=disable
     depends_on:
       db:
         condition: service_healthy

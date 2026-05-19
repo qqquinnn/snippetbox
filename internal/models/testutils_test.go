@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"os"
 	"testing"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 // Creates new connection pool for test database, executes setup.sql
@@ -16,7 +18,7 @@ func newTestDB(t *testing.T) *sql.DB {
 	}
 
 	// Establish connection pool for test database.
-	db, err := sql.Open("mysql", dsn)
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}

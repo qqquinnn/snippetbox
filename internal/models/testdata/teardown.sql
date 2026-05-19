@@ -1,4 +1,2 @@
-USE snippetbox_test;
-
-DROP TABLE users;
-DROP TABLE snippets;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS snippets;

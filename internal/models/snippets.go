@@ -30,29 +30,22 @@ type SnippetModelInterface interface {
 // Insert a new snippet into the database.
 func (model *SnippetModel) Insert(title, content string, expires int) (int, error) {
 	stmt := `INSERT INTO snippets (title, content, created, expires)
-	VALUES(?, ?, UTC_TIMESTAMP(), DATE_ADD(UTC_TIMESTAMP(), INTERVAL ? DAY))`
+	VALUES($1, $2, now() AT TIME ZONE 'utc', now() AT TIME ZONE 'utc' + (INTERVAL '1 day' * $3))
+	RETURNING id`
 
-	// Use method on the embedded connection pool to execute the SQL
-	// statement. First parameter is the statement, followed by the
-	// values for the placeholder parameters.
-	result, err := model.DB.Exec(stmt, title, content, expires)
+	var id int
+	err := model.DB.QueryRow(stmt, title, content, expires).Scan(&id)
 	if err != nil {
 		return 0, err
 	}
 
-	// Get the ID of the newly inserted record in the snippets table.
-	id, err := result.LastInsertId()
-	if err != nil {
-		return 0, err
-	}
-
-	return int(id), nil
+	return id, nil
 }
 
 // Return a specific snippet based on its id.
 func (model *SnippetModel) Get(id int) (Snippet, error) {
 	stmt := `SELECT id, title, content, created, expires FROM snippets
-	WHERE expires > UTC_TIMESTAMP() AND id = ?`
+	WHERE expires > (now() AT TIME ZONE 'utc') AND id = $1`
 
 	// Use method on connection pool to execute SQL statement.
 	row := model.DB.QueryRow(stmt, id)
@@ -77,7 +70,7 @@ func (model *SnippetModel) Get(id int) (Snippet, error) {
 // Return the 10 most recently created snippets.
 func (model *SnippetModel) Latest() ([]Snippet, error) {
 	stmt := `SELECT id, title, content, created, expires FROM snippets
-	WHERE expires > UTC_TIMESTAMP() ORDER BY id DESC LIMIT 10`
+	WHERE expires > (now() AT TIME ZONE 'utc') ORDER BY id DESC LIMIT 10`
 
 	// Use method on connection pool to execute SQL statement.
 	rows, err := model.DB.Query(stmt)

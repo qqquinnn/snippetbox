@@ -13,10 +13,10 @@ import (
 
 	"github.com/qqquinnn/snippetbox/internal/models"
 
-	"github.com/alexedwards/scs/mysqlstore"
+	"github.com/alexedwards/scs/postgresstore"
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-playground/form/v4"
-	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/joho/godotenv"
 )
 
@@ -39,7 +39,7 @@ func main() {
 	// Define command-line flags using env variables as defaults.
 	defaultDSN := os.Getenv("SNIPPETBOX_DSN")
 	defaultAddr := os.Getenv("PORT")
-	dsn := flag.String("dsn", defaultDSN, "MySQL data source name")
+	dsn := flag.String("dsn", defaultDSN, "PostgreSQL data source name")
 	addr := flag.String("addr", ":"+defaultAddr, "HTTP network address")
 	debug := flag.Bool("debug", false, "Enable debug mode")
 
@@ -77,7 +77,7 @@ func main() {
 
 	// Initialize and configure new session manager.
 	sessionManager := scs.New()
-	sessionManager.Store = mysqlstore.New(db)
+	sessionManager.Store = postgresstore.New(db)
 	sessionManager.Lifetime = 12 * time.Hour
 	sessionManager.Cookie.Secure = true
 
@@ -129,7 +129,7 @@ func main() {
 
 // Wraps sql.Open() and returns a sql.DB connection pool.
 func openDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("mysql", dsn)
+	db, err := sql.Open("pgx", dsn)
 	if err != nil {
 		return nil, err
 	}
