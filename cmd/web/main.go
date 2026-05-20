@@ -3,16 +3,18 @@ package main
 import (
 	"context"
 	"database/sql"
-	"flag"
 	"html/template"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"time"
 
 	"github.com/qqquinnn/snippetbox/internal/models"
 
+	"cloud.google.com/go/cloudsqlconn"
+	"cloud.google.com/go/cloudsqlconn/postgres/pgxv5"
 	"github.com/alexedwards/scs/postgresstore"
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-playground/form/v4"
@@ -33,37 +35,37 @@ type application struct {
 
 func main() {
 	ctx := context.Background()
-	// Load .env file for local development.
+	// Load .env file & define variables for local development.
 	_ = godotenv.Load()
+	dsn := os.Getenv("SNIPPETBOX_DSN")
+	addr := ":" + os.Getenv("PORT")
+	debug := false
 
-	// Define command-line flags using env variables as defaults.
-	defaultDSN := os.Getenv("SNIPPETBOX_DSN")
-	defaultAddr := os.Getenv("PORT")
-	dsn := flag.String("dsn", defaultDSN, "PostgreSQL data source name")
-	addr := flag.String("addr", ":"+defaultAddr, "HTTP network address")
-	debug := flag.Bool("debug", false, "Enable debug mode")
-
-	// Parse the command-line flags.
-	flag.Parse()
+	prodStr := os.Getenv("IS_PROD")
+	prod, err := strconv.ParseBool(prodStr)
+	if err != nil {
+		prod = false
+	}
 
 	// Panic if DSN config is missing.
-	if *dsn == "" {
-		panic("database DSN must be provided via -dsn flag or SNIPPETBOX_DSN env var")
+	if dsn == "" {
+		panic("database DSN must be provided via SNIPPETBOX_DSN env var")
 	}
 
 	// Initialize a structured logger which writes to stdout with default settings.
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	// Pass openDB() the DSN from the command-line flag.
-	db, err := openDB(*dsn)
+	db, cleanup, err := openDB(dsn, prod)
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)
 	}
 
-	// Defer a call to db.Close() so that the connection pool is closed
-	// before the main() function exits.
+	// Defer a call to close the connection pool & terminate Cloud SQL connector's
+	// background goroutines before the main function exits.
 	defer db.Close()
+	defer cleanup()
 
 	// Initialize template cache.
 	templateCache, err := newTemplateCache()
@@ -83,7 +85,7 @@ func main() {
 
 	// Initialize new instance of the application struct.
 	app := &application{
-		debug:          *debug,
+		debug:          debug,
 		logger:         logger,
 		snippets:       &models.SnippetModel{DB: db},
 		users:          &models.UserModel{DB: db},
@@ -94,7 +96,7 @@ func main() {
 
 	// Initialize a new http.Server struct.
 	srv := &http.Server{
-		Addr:     *addr,
+		Addr:     addr,
 		Handler:  app.routes(),
 		ErrorLog: slog.NewLogLogger(logger.Handler(), slog.LevelError),
 		// Idle, Read & Write timeouts.
@@ -127,18 +129,70 @@ func main() {
 	}
 }
 
-// Wraps sql.Open() and returns a sql.DB connection pool.
-func openDB(dsn string) (*sql.DB, error) {
+// Wraps sql.Open(), registers the Cloud SQL driver, and returns sql.DB pool & cleanup func.
+func OpenaDB(dsn string) (*sql.DB, func() error, error) {
+	// Register custom driver with IAM Auth enabled.
+	cleanup, err := pgxv5.RegisterDriver("cloudsql-postgres", cloudsqlconn.WithIAMAuthN())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Open SQL connection.
+	db, err := sql.Open("cloudsql-postgres", dsn)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+
+	// Verify database connection.
+	err = db.Ping()
+	if err != nil {
+		db.Close()
+		cleanup()
+		return nil, nil, err
+	}
+
+	return db, cleanup, nil
+}
+
+// Wraps sql.Open() registers Cloud SQL driver (if prod), and returns a sql.DB connection pool & cleanup func.
+func openDB(dsn string, prod bool) (*sql.DB, func() error, error) {
+	if prod {
+		// Register custom driver with IAM Auth enabled.
+		cleanup, err := pgxv5.RegisterDriver("cloudsql-postgres", cloudsqlconn.WithIAMAuthN())
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Open SQL connection.
+		db, err := sql.Open("cloudsql-postgres", dsn)
+		if err != nil {
+			cleanup()
+			return nil, nil, err
+		}
+
+		// Verify database connection.
+		err = db.Ping()
+		if err != nil {
+			db.Close()
+			cleanup()
+			return nil, nil, err
+		}
+
+		return db, cleanup, nil
+	}
+
+	// Local dev setup
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	err = db.Ping()
 	if err != nil {
 		db.Close()
-		return nil, err
+		return nil, nil, err
 	}
 
-	return db, nil
+	return db, func() error { return nil }, nil
 }
