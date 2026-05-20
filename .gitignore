@@ -1,4 +1,5 @@
 .env
 bin
 tmp
-testdata
+testdata/*
+docker-compose.override.yml
