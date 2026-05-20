@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/qqquinnn/snippetbox/internal/models"
 	"github.com/qqquinnn/snippetbox/internal/validator"
@@ -129,6 +130,9 @@ func (app *application) snippetCreatePost(w http.ResponseWriter, r *http.Request
 		app.render(w, r, http.StatusUnprocessableEntity, "create.html", data)
 		return
 	}
+
+	// Normalize snippet content by removing carriage returns.
+	form.Content = strings.ReplaceAll(form.Content, "\r", "")
 
 	// Pass data to the SnippetModel.Insert() method.
 	id, err := app.snippets.Insert(form.Title, form.Content, form.Expires)
