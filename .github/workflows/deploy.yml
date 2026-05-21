@@ -70,3 +70,4 @@ jobs:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.REGION }}
           image: ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}/web:${{ github.sha }}
+          env_vars: IS_PROD=true,SNIPPETBOX_DSN=${{ secrets.SNIPPETBOX_DSN }}
