@@ -27,7 +27,7 @@ jobs:
       
       - name: Run Integration Tests
         run: |
-          docker-compose --profile testing run --rm test
+          docker compose --profile testing run --rm test
   
   build-and-deploy:
     needs: test
