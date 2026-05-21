@@ -23,7 +23,7 @@ services:
     volumes:
       - .:/app
     working_dir: /app
-    command: go test -v ./internal/models/...
+    command: sh -c "go test -v ./cmd/web; go test -v ./internal/models/..."
     environment:
       - SNIPPETBOX_TEST_DSN=postgres://web:pass@db:5432/snippetbox_test?sslmode=disable
     depends_on:
