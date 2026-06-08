@@ -39,21 +39,40 @@ func main() {
 	_ = godotenv.Load()
 	dsn := os.Getenv("SNIPPETBOX_DSN")
 	addr := ":" + os.Getenv("PORT")
-	debug := false
+	debug, _ := strconv.ParseBool(os.Getenv("DEBUG"))
 
 	prodStr := os.Getenv("IS_PROD")
 	prod, err := strconv.ParseBool(prodStr)
-	if err != nil {
-		prod = false
-	}
 
 	// Panic if DSN config is missing.
 	if dsn == "" {
 		panic("database DSN must be provided via SNIPPETBOX_DSN env var")
 	}
 
-	// Initialize a structured logger which writes to stdout with default settings.
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	// Initialize a structured logger.
+	var logger *slog.Logger
+
+	if !prod {
+		logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
+	} else {
+		// Configure minimum log level.
+		logLevel := slog.LevelInfo
+		if debug {
+			logLevel = slog.LevelDebug
+		}
+
+		// Initialize a structured logger which writes JSON to stdout.
+		// Replace the default "level" key with "severity" for Google Cloud Logging compatibility.
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+			Level: logLevel,
+			ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+				if a.Key == slog.LevelKey {
+					a.Key = "severity"
+				}
+				return a
+			},
+		}))
+	}
 
 	// Pass openDB() the DSN from the command-line flag.
 	db, cleanup, err := openDB(dsn, prod)
