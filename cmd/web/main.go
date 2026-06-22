@@ -148,32 +148,6 @@ func main() {
 	}
 }
 
-// Wraps sql.Open(), registers the Cloud SQL driver, and returns sql.DB pool & cleanup func.
-func OpenaDB(dsn string) (*sql.DB, func() error, error) {
-	// Register custom driver with IAM Auth enabled.
-	cleanup, err := pgxv5.RegisterDriver("cloudsql-postgres", cloudsqlconn.WithIAMAuthN())
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Open SQL connection.
-	db, err := sql.Open("cloudsql-postgres", dsn)
-	if err != nil {
-		cleanup()
-		return nil, nil, err
-	}
-
-	// Verify database connection.
-	err = db.Ping()
-	if err != nil {
-		db.Close()
-		cleanup()
-		return nil, nil, err
-	}
-
-	return db, cleanup, nil
-}
-
 // Wraps sql.Open() registers Cloud SQL driver (if prod), and returns a sql.DB connection pool & cleanup func.
 func openDB(dsn string, prod bool) (*sql.DB, func() error, error) {
 	if prod {
